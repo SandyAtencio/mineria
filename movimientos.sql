@@ -69,15 +69,69 @@ CREATE TABLE h_caracteristicas_cliente_frecuente(
     valorTotalProductos     NUMBER(30)  CONSTRAINT h_val_tot_pro_nn     NOT NULL     
 );
 
-
+/* Vista Producto */
 CREATE VIEW v_d_producto AS 
 SELECT DISTINCT p.Numero, p.Presentacion, p.ValorVenta, tp.Descripcion FROM Producto p
 INNER JOIN Tipo_producto tp ON p.cod_tip_produc = tp.Codigo;
 
 /* vista sucursal*/
 CREATE VIEW v_d_sucursal    AS 
-SELECT DISTINCT id_sucursal, s.descripcion, b.estrato, b.nombre AS barrio,
+SELECT DISTINCT id_sucursal, s.descripcion, b.estrato, b.Nombre AS barrio,
 c.nombre AS ciudad, d.nombre AS departamento FROM sucursal s 
 INNER JOIN barrio b         ON cod_barrio   = b.codigo
 INNER JOIN ciudad c         ON b.cod_ciudad = c.codigo
 INNER JOIN departamento d   ON c.cod_dpto   = d.codigo;
+
+/* Vista Cliente */
+CREATE VIEW v_d_cliente     AS
+SELECT cl.cedula, TRUNC( MONTHS_BETWEEN(v.Fecha,cl.Fecha_nac )/12) AS Edad, b.Estrato, 
+cl.genero, cl.estado_civil, ing.Descripcion, cl.trabajo, b.Nombre, c.Nombre, d.Nombre,
+te.Descripcion, pr.nombre, ( SELECT Nombre FROM Barrio WHERE Codigo = cl.cod_barrioEmpr ) AS Barrio_Empresa FROM Cliente cl
+INNER JOIN Venta v          ON cl.Cedula        = v.Ced_cliente
+INNER JOIN Barrio b         ON cl.cod_barrio    = b.Codigo
+INNER JOIN Ingresos ing     ON cl.cod_ingresos  = ing.Codigo
+INNER JOIN Tipo_Empresa te  ON cl.Cod_tipoEmp   = te.Id
+INNER JOIN Profesion    pr  ON cl.cod_profesion = pr.Id
+INNER JOIN Ciudad c         ON b.Cod_ciudad     = c.Codigo
+INNER JOIN Departamento d   ON c.Cod_dpto       = d.Codigo;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
