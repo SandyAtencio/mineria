@@ -68,3 +68,8 @@ CREATE TABLE h_caracteristicas_cliente_frecuente(
     cantidadTotalProductos  NUMBER(5)   CONSTRAINT h_can_tot_pro_nn     NOT NULL,
     valorTotalProductos     NUMBER(30)  CONSTRAINT h_val_tot_pro_nn     NOT NULL     
 );
+
+
+CREATE VIEW d_producto AS 
+SELECT DISTINCT p.Numero, p.Presentacion, p.ValorVenta, tp.Descripcion FROM Producto p
+INNER JOIN Tipo_producto tp ON p.cod_tip_produc = tp.Codigo;
