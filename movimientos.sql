@@ -68,3 +68,15 @@ CREATE TABLE h_caracteristicas_cliente_frecuente(
     cantidadTotalProductos  NUMBER(5)   CONSTRAINT h_can_tot_pro_nn     NOT NULL,
     valorTotalProductos     NUMBER(30)  CONSTRAINT h_val_tot_pro_nn     NOT NULL     
 );
+
+/* vista sucursal*/
+GO
+CREATE VIEW v_d_sucursal AS 
+SELECT DISTINCT id_sucursal, s.descripcion, b.estrato, b.nombre AS barrio,
+c.nombre AS ciudad, d.nombre AS departamento
+FROM sucursal s INNER JOIN barrio b 
+ON cod_barrio = b.codigo
+INNER JOIN ciudad c 
+ON b.cod_ciudad = c.codigo
+INNER JOIN departamento d 
+ON c.cod_dpto = d.codigo;
