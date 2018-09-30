@@ -74,13 +74,31 @@ CREATE VIEW v_d_producto AS
 SELECT DISTINCT p.Numero, p.Presentacion, p.ValorVenta, tp.Descripcion FROM Producto p
 INNER JOIN Tipo_producto tp ON p.cod_tip_produc = tp.Codigo;
 
-/* vista sucursal*/
+/* Vista sucursal*/
 CREATE VIEW v_d_sucursal    AS 
 SELECT DISTINCT id_sucursal, s.descripcion, b.estrato, b.Nombre AS barrio,
 c.nombre AS ciudad, d.nombre AS departamento FROM sucursal s 
 INNER JOIN barrio b         ON cod_barrio   = b.codigo
 INNER JOIN ciudad c         ON b.cod_ciudad = c.codigo
 INNER JOIN departamento d   ON c.cod_dpto   = d.codigo;
+
+/* Vista dia */
+CREATE VIEW v_d_dia   AS
+SELECT DISTINCT 
+TO_CHAR(Fecha,'DD')     AS dia, 
+TO_CHAR(Fecha,'MM')     AS mes,
+TO_CHAR(Fecha,'YYYY')   AS anio, 
+TO_CHAR(Fecha,'DAY')    AS nombre_dia,
+CASE
+WHEN TO_CHAR(Fecha,'MM') < '07' THEN '1'
+ELSE '2' 
+END AS semestre,
+(SELECT COUNT(*) FROM festivo
+    WHERE   TO_CHAR(v.Fecha,'DD')   = dia 
+    AND     TO_CHAR(v.Fecha,'MM')   = mes
+    AND     TO_CHAR(v.Fecha,'YYYY') = anio
+) AS festivo
+FROM venta v;
 
 /* Vista Cliente */
 CREATE VIEW v_d_cliente     AS
@@ -94,44 +112,3 @@ INNER JOIN Tipo_Empresa te  ON cl.Cod_tipoEmp   = te.Id
 INNER JOIN Profesion    pr  ON cl.cod_profesion = pr.Id
 INNER JOIN Ciudad c         ON b.Cod_ciudad     = c.Codigo
 INNER JOIN Departamento d   ON c.Cod_dpto       = d.Codigo;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
