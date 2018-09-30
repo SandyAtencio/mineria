@@ -70,6 +70,14 @@ CREATE TABLE h_caracteristicas_cliente_frecuente(
 );
 
 
-CREATE VIEW d_producto AS 
+CREATE VIEW v_d_producto AS 
 SELECT DISTINCT p.Numero, p.Presentacion, p.ValorVenta, tp.Descripcion FROM Producto p
 INNER JOIN Tipo_producto tp ON p.cod_tip_produc = tp.Codigo;
+
+/* vista sucursal*/
+CREATE VIEW v_d_sucursal    AS 
+SELECT DISTINCT id_sucursal, s.descripcion, b.estrato, b.nombre AS barrio,
+c.nombre AS ciudad, d.nombre AS departamento FROM sucursal s 
+INNER JOIN barrio b         ON cod_barrio   = b.codigo
+INNER JOIN ciudad c         ON b.cod_ciudad = c.codigo
+INNER JOIN departamento d   ON c.cod_dpto   = d.codigo;
