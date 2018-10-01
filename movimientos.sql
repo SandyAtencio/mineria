@@ -133,7 +133,6 @@ SELECT seq_cliente.NEXTVAL, cedula, Edad, Estrato, genero, estado_civil, ingreso
 ciudad, departamento, tipo_empresa, profesion, Barrio_Empresa
 FROM caracteristicasClienteFrecuente.v_d_cliente;
 
-
 /* Vista del HECHO */
 CREATE VIEW v_hecho AS
 SELECT p.Numero, p.ValorVenta, s.id AS id_sucursal, bs.Estrato AS Estrato_sucursal, cl.Cedula, 
@@ -146,6 +145,25 @@ INNER JOIN Barrio   bs  ON s.cod_barrio     = b.Codigo
 INNER JOIN Barrio   bc  ON cl.cod_barrio    = bc.Codigo
 INNER JOIN Ciudad   c   ON bc.cod_ciudad    = c.Codigo;
 
+/* Funciones de medida 1*/
+CREATE OR REPLACE FUNCTION fun_valorTotalproductos(
+    v_cedula    cliente.cedula%TYPE,
+    v_numero    producto.numero%TYPE,
+    v_sucursal  sucursal.id%TYPE
+)
+RETURN NUMBER
+AS
+v_cantidad NUMBER;
+BEGIN
+  SELECT SUM(v.cantidad) INTO v_cantidad
+  FROM  Venta v
+  INNER JOIN Sucursal s ON s.id     = v.cod_sucursal
+  INNER JOIN Producto p ON p.numero = v.num_producto 
+  INNER JOIN Cliente  c ON c.Cedula = v.ced_cliente
+  WHERE  c.cedula = v_cedula  AND p.numero = v_numero AND s.id = v_sucursal;
+  RETURN v_cantidad;
+END;
+/
 
 /* Funciones de medida 2*/
 CREATE OR REPLACE FUNCTION fun_ValorTotalProductos(
@@ -165,4 +183,5 @@ BEGIN
   RETURN v_valorTotal;
 END;
 /
+
 
