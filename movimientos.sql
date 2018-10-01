@@ -66,7 +66,7 @@ CREATE TABLE h_caracteristicas_cliente_frecuente(
     llave_cliente           VARCHAR(10) CONSTRAINT h_cli_llav_nn        NOT NULL CONSTRAINT h_cli_llav_fk       REFERENCES d_cliente(llave_cliente),
     llave_dia               VARCHAR(10) CONSTRAINT h_dia_llav_nn        NOT NULL CONSTRAINT h_dia_llav_fk       REFERENCES d_dia(llave_dia),
     cantidadTotalProductos  NUMBER(5)   CONSTRAINT h_can_tot_pro_nn     NOT NULL,
-    valorTotalProductos     FLOAT(30)  CONSTRAINT h_val_tot_pro_nn     NOT NULL     
+    valorTotalProductos     NUMBER(20)  CONSTRAINT h_val_tot_pro_nn     NOT NULL     
 );
 
 /* Vista Producto */
@@ -136,7 +136,7 @@ FROM caracteristicasClienteFrecuente.v_d_cliente;
 /* Vista del HECHO */
 CREATE VIEW v_hecho AS
 SELECT p.Numero, p.ValorVenta, s.id AS id_sucursal, bs.Estrato AS Estrato_sucursal, cl.Cedula, 
-TRUNC( MONTHS_BETWEEN(v.Fecha,cl.Fecha_nac )/12) AS Edad, bc.Estrato AS Estrato_cliente, c.Nombre
+TRUNC( MONTHS_BETWEEN(v.Fecha,cl.Fecha_nac )/12) AS Edad, bc.Estrato AS Estrato_cliente, c.Nombre, v.Fecha
 FROM Venta v 
 INNER JOIN Producto p   ON v.Num_producto   = p.Numero
 INNER JOIN Sucursal s   ON v.cod_sucursal   = s.id
@@ -146,10 +146,11 @@ INNER JOIN Barrio   bc  ON cl.cod_barrio    = bc.Codigo
 INNER JOIN Ciudad   c   ON bc.cod_ciudad    = c.Codigo;
 
 /* Funciones de medida 1*/
-CREATE OR REPLACE FUNCTION fun_valorTotalproductos(
+CREATE OR REPLACE FUNCTION fun_cantidadTotalProductos(
     v_cedula    cliente.cedula%TYPE,
     v_numero    producto.numero%TYPE,
-    v_sucursal  sucursal.id%TYPE
+    v_sucursal  sucursal.id%TYPE,
+    v_fecha     Venta.Fecha%TYPE
 )
 RETURN NUMBER
 AS
@@ -160,16 +161,17 @@ BEGIN
   INNER JOIN Sucursal s ON s.id     = v.cod_sucursal
   INNER JOIN Producto p ON p.numero = v.num_producto 
   INNER JOIN Cliente  c ON c.Cedula = v.ced_cliente
-  WHERE  c.cedula = v_cedula  AND p.numero = v_numero AND s.id = v_sucursal;
+  WHERE  c.cedula = v_cedula AND p.numero = v_numero AND s.id = v_sucursal AND v.Fecha = v_fecha;
   RETURN v_cantidad;
 END;
 /
 
 /* Funciones de medida 2*/
 CREATE OR REPLACE FUNCTION fun_ValorTotalProductos(
-    v_cedula Cliente.Cedula%TYPE,
-    v_producto Producto.Numero%TYPE,
-    v_venta_producto Producto.ValorVenta%TYPE
+    v_cedula            Cliente.Cedula%TYPE,
+    v_producto          Producto.Numero%TYPE,
+    v_venta_producto    Producto.ValorVenta%TYPE,
+    v_fecha             Venta.Fecha%TYPE
 )
 RETURN NUMBER
 AS
@@ -179,9 +181,80 @@ BEGIN
   FROM Venta v 
   INNER JOIN Cliente cl ON cl.Ced_cliente       = v.Ced_cliente
   INNER JOIN Producto p ON p.Numero             = v.Num_producto
-  WHERE cl.Ced_cliente  = v_cedula AND p.Numero = v_producto;
+  WHERE cl.Ced_cliente  = v_cedula AND p.Numero = v_producto AND v.Fecha = v_fecha;
   RETURN v_valorTotal;
 END;
 /
+
+/* BLOQUE, ESTO SE HACE EN LA BODEGA DE DATOS*/
+DECLARE 
+
+/* SE CREA EL CURSOR QUE ALMACENA LA DATA DE LA VISTA HECHO */
+CURSOR c_hecho IS SELECT * FROM MOVIMIENTOS.v_hecho;
+
+/* VARIABLE TIPO RECORD/FILA DE LA TABLA DE HECHO DE LA BODEGA */
+r_hecho h_caracteristicas_cliente_frecuente%ROWTYPE;
+
+/* SE DECLARAN LAS VARIABLES EN BASE A LOS VALORES QUE DEVUELVE LA VISTA HECHO */
+v_producto          d_producto.Numero%TYPE;
+v_venta_producto    d_producto.valorVenta%TYPE;
+v_sucursal          d_sucursal.id_sucursal%TYPE;
+v_estrato_sucursal  d_sucursal.estrato%TYPE;
+v_cliente           d_cliente.cedula%TYPE;
+v_edad_cliente      d_cliente.edad%TYPE;
+v_estrato_cliente   d_cliente.estrato%TYPE;
+v_ciudad_cliente    d_cliente.ciudad%TYPE;
+v_fecha             DATE;
+
+BEGIN
+    /* SE ABRE EL CURSOR PARA TRABAJAR CON LA DATA QUE EL ALMACENA*/
+    OPEN c_hecho;
+    /* SE CREA EL CICLO PARA RECORRER LOS DATOS CURSOR */
+    LOOP
+        /* SE OBTIENE LA PRIMER FILA DEL CURSOR Y SUS DATA SE ALMACENA EN CADA VARIABLE DECLARADA*/
+        FETCH c_hecho INTO v_producto, v_venta_producto, v_sucursal, v_estrato_sucursal, v_cliente,  v_edad_cliente, v_estrato_cliente, v_ciudad_cliente;
+        /* SE VERIFICA QUE EL CURSOR TENGA DATOS DE LO CONTRARIO SE SALE DEL CICLO*/
+        EXIT WHEN c_hecho%NOTFOUND;
+
+        /* Tabla de hecho */
+        CREATE TABLE h_caracteristicas_cliente_frecuente(
+            llave_producto          VARCHAR(10) CONSTRAINT h_pro_llav_nn        NOT NULL CONSTRAINT h_pro_llav_fk       REFERENCES d_producto(llave_producto),
+            llave_sucursal          VARCHAR(10) CONSTRAINT h_sucursal_llav_nn   NOT NULL CONSTRAINT h_sucursal_llav_fk  REFERENCES d_sucursal(llave_sucursal),
+            llave_cliente           VARCHAR(10) CONSTRAINT h_cli_llav_nn        NOT NULL CONSTRAINT h_cli_llav_fk       REFERENCES d_cliente(llave_cliente),
+            llave_dia               VARCHAR(10) CONSTRAINT h_dia_llav_nn        NOT NULL CONSTRAINT h_dia_llav_fk       REFERENCES d_dia(llave_dia),
+            cantidadTotalProductos  NUMBER(5)   CONSTRAINT h_can_tot_pro_nn     NOT NULL,
+            valorTotalProductos     NUMBER(20)  CONSTRAINT h_val_tot_pro_nn     NOT NULL     
+        );
+
+        /* SE SELECCIONA LA LLAVE DE LA DIMENSION PRODUCTO Y SE ALMACENA EN LA VARIABLE RECORD EN LA POSICION DE llave_producto*/
+        SELECT llave_producto INTO r_hecho.llave_producto FROM d_producto
+        WHERE  numero_producto = v_producto AND valorVenta = v_venta_producto;
+        /* SE SELECCIONA LA LLAVE DE LA DIMENSION SUCURSAL Y SE ALMACENA EN LA VARIABLE RECORD EN LA POSICION DE llave_sucursal*/
+        SELECT llave_sucursal INTO r_hecho.llave_sucursal FROM d_sucursal
+        WHERE  id_sucursal = v_sucursal AND estrato = v_estrato_sucursal;
+        /* SE SELECCIONA LA LLAVE DE LA DIMENSION CLIENTE Y SE ALMACENA EN LA VARIABLE RECORD EN LA POSICION DE llave_cliente*/
+        SELECT llave_cliente INTO r_hecho.llave_cliente FROM d_cliente
+        WHERE  cedula = v_cliente AND edad = v_edad_cliente AND estrato = v_estrato_cliente AND ciudad v_ciudad_cliente;
+        /* SE SELECCIONA LA LLAVE DE LA DIMENSION DIA Y SE ALMACENA EN LA VARIABLE RECORD EN LA POSICION DE Llave_dia*/
+        SELECT Llave_dia INTO r_hecho.Llave_dia FROM d_dia
+        WHERE  dd = TO_CHAR(v_fecha, 'dd') AND mes = TO_CHAR(v_fecha, 'MM') AND anio = TO_CHAR(v_fecha, 'YYYY');
+
+        /* Se Almacenan el valor de las medidas en la variable RECORD/FILA llamando a las fuciones*/
+        r_hecho.cantidadTotalProductos  := MOVIMIENTOS.fun_cantidadTotalProductos(v_cliente, v_producto, v_sucursal,  v_fecha);
+        r_hecho.valorTotalProductos     := MOVIMIENTOS.fun_ValorTotalProductos(v_cliente, v_producto, v_venta_producto, v_fecha);
+
+        /* SE INSERTA EL RECORD/FILA EN LA TABLA DE HECHO */
+        INSERT INTO h_caracteristicas_cliente_frecuente VALUES r_hecho;
+    
+    /* SE CIERRA EL CICLO*/
+    END LOOP;
+    /* SE CIERRA EL CURSOR CUANDO YA SE HA RECORRIDO TODAS LAS FILAS*/
+    CLOSE c_hecho;
+    /* SE GUARDA PERMANENTEMENTE LOS CAMBIOS */
+    COMMIT;
+/* FIN DE LAS INSTRUCCIONES*/
+END;
+/
+
 
 
