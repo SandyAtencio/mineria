@@ -81,3 +81,23 @@ c.nombre AS ciudad, d.nombre AS departamento FROM sucursal s
 INNER JOIN barrio b         ON cod_barrio   = b.codigo
 INNER JOIN ciudad c         ON b.cod_ciudad = c.codigo
 INNER JOIN departamento d   ON c.cod_dpto   = d.codigo;
+
+/* vista dia */
+CREATE VIEW v_d_dia   AS
+SELECT DISTINCT 
+TO_CHAR(fecha,'DD')  AS dia, 
+TO_CHAR(mes,'MM')    AS mes,
+TO_CHAR(anio,'YYYY') AS anio, 
+TO_CHAR(fecha,'DAY') AS nombre_dia,
+CASE
+WHEN TO_CHAR(mes,'MM') < '07' THEN '1'
+ELSE '2' 
+END AS semestre,
+(SELECT COUNT(*) FROM festivo
+WHERE TO_CHAR(v.fecha,'DD') = dia, 
+AND TO_CHAR(v.fecha,'MM') = mes,
+AND TO_CHAR(v.fecha,'YYYY') = anio,
+) AS festivo
+FROM venta v;
+
+
