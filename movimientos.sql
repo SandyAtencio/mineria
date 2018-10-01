@@ -9,7 +9,7 @@ CREATE TABLE d_producto(
     llave_producto  VARCHAR(10) CONSTRAINT d_pro_llav_pk    PRIMARY KEY,
     numero_producto VARCHAR(10) CONSTRAINT d_pro_num_nn     NOT NULL,
     presentacion    VARCHAR(20) CONSTRAINT d_pro_pre_nn     NOT NULL,
-    valorVenta      VARCHAR(20) CONSTRAINT d_pro_val_nn     NOT NULL,
+    valorVenta      NUMBER(20) CONSTRAINT d_pro_val_nn     NOT NULL,
     tipoProduto     VARCHAR(10) CONSTRAINT d_pro_tip_nn     NOT NULL,
 );
 
@@ -112,3 +112,23 @@ INNER JOIN Tipo_Empresa te  ON cl.Cod_tipoEmp   = te.Id
 INNER JOIN Profesion    pr  ON cl.cod_profesion = pr.Id
 INNER JOIN Ciudad c         ON b.Cod_ciudad     = c.Codigo
 INNER JOIN Departamento d   ON c.Cod_dpto       = d.Codigo;
+
+
+CREATE OR REPLACE FUNCTION fun_valorTotalproductos(
+    v_cedula    cliente.cedula%TYPE,
+    v_numero    producto.numero%TYPE,
+    v_sucursal  sucursal.id%TYPE
+)
+RETURN NUMBER
+AS
+v_cantidad NUMBER;
+BEGIN
+  SELECT SUM(v.cantidad) INTO v_cantidad
+  FROM  Venta v
+  INNER JOIN Sucursal s ON s.id     = v.cod_sucursal
+  INNER JOIN Producto p ON p.numero = v.num_producto 
+  INNER JOIN Cliente  c ON c.Cedula = v.ced_cliente
+  WHERE  c.cedula = v_cedula  AND p.numero = v_numero AND s.id = v_sucursal;
+  RETURN v_cantidad;
+END;
+/
