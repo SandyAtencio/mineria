@@ -9,7 +9,7 @@ CREATE TABLE d_producto(
     llave_producto  VARCHAR(10) CONSTRAINT d_pro_llav_pk    PRIMARY KEY,
     numero_producto VARCHAR(10) CONSTRAINT d_pro_num_nn     NOT NULL,
     presentacion    VARCHAR(20) CONSTRAINT d_pro_pre_nn     NOT NULL,
-    valorVenta      VARCHAR(20) CONSTRAINT d_pro_val_nn     NOT NULL,
+    valorVenta      NUMBER(20) CONSTRAINT d_pro_val_nn     NOT NULL,
     tipoProduto     VARCHAR(10) CONSTRAINT d_pro_tip_nn     NOT NULL,
 );
 
@@ -66,7 +66,7 @@ CREATE TABLE h_caracteristicas_cliente_frecuente(
     llave_cliente           VARCHAR(10) CONSTRAINT h_cli_llav_nn        NOT NULL CONSTRAINT h_cli_llav_fk       REFERENCES d_cliente(llave_cliente),
     llave_dia               VARCHAR(10) CONSTRAINT h_dia_llav_nn        NOT NULL CONSTRAINT h_dia_llav_fk       REFERENCES d_dia(llave_dia),
     cantidadTotalProductos  NUMBER(5)   CONSTRAINT h_can_tot_pro_nn     NOT NULL,
-    valorTotalProductos     NUMBER(30)  CONSTRAINT h_val_tot_pro_nn     NOT NULL     
+    valorTotalProductos     FLOAT(30)  CONSTRAINT h_val_tot_pro_nn     NOT NULL     
 );
 
 /* Vista Producto */
@@ -103,12 +103,66 @@ FROM venta v;
 /* Vista Cliente */
 CREATE VIEW v_d_cliente     AS
 SELECT cl.cedula, TRUNC( MONTHS_BETWEEN(v.Fecha,cl.Fecha_nac )/12) AS Edad, b.Estrato, 
-cl.genero, cl.estado_civil, ing.Descripcion, cl.trabajo, b.Nombre, c.Nombre, d.Nombre,
-te.Descripcion, pr.nombre, ( SELECT Nombre FROM Barrio WHERE Codigo = cl.cod_barrioEmpr ) AS Barrio_Empresa FROM Cliente cl
-INNER JOIN Venta v          ON cl.Cedula        = v.Ced_cliente
-INNER JOIN Barrio b         ON cl.cod_barrio    = b.Codigo
-INNER JOIN Ingresos ing     ON cl.cod_ingresos  = ing.Codigo
-INNER JOIN Tipo_Empresa te  ON cl.Cod_tipoEmp   = te.Id
-INNER JOIN Profesion    pr  ON cl.cod_profesion = pr.Id
-INNER JOIN Ciudad c         ON b.Cod_ciudad     = c.Codigo
-INNER JOIN Departamento d   ON c.Cod_dpto       = d.Codigo;
+cl.genero, cl.estado_civil, ing.Descripcion AS ingresos, cl.trabajo, bc.Nombre AS barrio, c.Nombre AS ciudad, d.Nombre AS departamento,
+te.Descripcion AS tipo_empresa, pr.nombre AS profesion, be.Nombre AS Barrio_Empresa FROM Cliente cl
+INNER JOIN Venta        v   ON cl.Cedula            = v.Ced_cliente
+INNER JOIN Barrio       bc  ON cl.cod_barrio        = bc.Codigo
+INNER JOIN Barrio       be  ON cl.cod_barrioEmpr    = be.Codigo
+INNER JOIN Ingresos     ing ON cl.cod_ingresos      = ing.Codigo
+INNER JOIN Tipo_Empresa te  ON cl.Cod_tipoEmp       = te.Id
+INNER JOIN Profesion    pr  ON cl.cod_profesion     = pr.Id
+INNER JOIN Ciudad       c   ON bc.Cod_ciudad        = c.Codigo
+INNER JOIN Departamento d   ON c.Cod_dpto           = d.Codigo;
+
+
+/*Insercion de los datos del esquema a la bodega*/
+INSERT INTO d_producto 
+SELECT seq_producto.NEXTVAL, Numero, Presentacion, ValorVenta, Descripcion
+FROM caracteristicasClienteFrecuente.v_d_producto;
+
+INSERT INTO d_sucursal
+SELECT seq_sucursal.NEXTVAL, id_sucursal, descripcion, estrato, barrio, ciudad, departamento
+FROM caracteristicasClienteFrecuente.v_d_sucursal;
+
+INSERT INTO d_dia
+SELECT seq_dia.NEXTVAL, dia, mes, anio, nombre_dia, semestre, festivo
+FROM caracteristicasClienteFrecuente.v_d_dia;
+
+INSERT INTO d_cliente
+SELECT seq_cliente.NEXTVAL, cedula, Edad, Estrato, genero, estado_civil, ingresos, trabajo, barrio,
+ciudad, departamento, tipo_empresa, profesion, Barrio_Empresa
+FROM caracteristicasClienteFrecuente.v_d_cliente;
+
+
+/* Vista del HECHO */
+CREATE VIEW v_hecho AS
+SELECT p.Numero, p.ValorVenta, s.id AS id_sucursal, bs.Estrato AS Estrato_sucursal, cl.Cedula, 
+TRUNC( MONTHS_BETWEEN(v.Fecha,cl.Fecha_nac )/12) AS Edad, bc.Estrato AS Estrato_cliente, c.Nombre
+FROM Venta v 
+INNER JOIN Producto p   ON v.Num_producto   = p.Numero
+INNER JOIN Sucursal s   ON v.cod_sucursal   = s.id
+INNER JOIN Cliente  cl  ON v.Ced_cliente    = cl.Cedula
+INNER JOIN Barrio   bs  ON s.cod_barrio     = b.Codigo
+INNER JOIN Barrio   bc  ON cl.cod_barrio    = bc.Codigo
+INNER JOIN Ciudad   c   ON bc.cod_ciudad    = c.Codigo;
+
+
+/* Funciones de medida 2*/
+CREATE OR REPLACE FUNCTION fun_ValorTotalProductos(
+    v_cedula Cliente.Cedula%TYPE,
+    v_producto Producto.Numero%TYPE,
+    v_venta_producto Producto.ValorVenta%TYPE
+)
+RETURN NUMBER
+AS
+v_valorTotal NUMBER;
+BEGIN
+  SELECT SUM( v.Cantidad * v_venta_producto) INTO v_valorTotal
+  FROM Venta v 
+  INNER JOIN Cliente cl ON cl.Ced_cliente       = v.Ced_cliente
+  INNER JOIN Producto p ON p.Numero             = v.Num_producto
+  WHERE cl.Ced_cliente  = v_cedula AND p.Numero = v_producto;
+  RETURN v_valorTotal;
+END;
+/
+
